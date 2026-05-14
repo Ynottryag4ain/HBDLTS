@@ -66,170 +66,138 @@ const PhotoBooth = () => {
     link.href = canvas.toDataURL('image/png')
     link.click()
   }
+  return (
+    <div className="h-screen w-full bg-[#fafafa] overflow-y-auto"> 
+  <div className="flex flex-col items-center p-4 pb-32 min-h-max">
+      
+      {/* Header */}
+      <div className="w-full max-w-md flex justify-between items-center py-4">
+        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <Sparkles className="text-pink-500" size={20} /> BeautyPlus Cam
+        </h1>
+        <button 
+          onClick={() => setFacingMode(prev => prev === "user" ? "environment" : "user")}
+          className="p-2 bg-white rounded-full shadow-sm border border-gray-100"
+        >
+          <FlipHorizontal size={20} />
+        </button>
+      </div>
 
-return (
-<div className="h-[100dvh] w-full bg-[#fafafa] overflow-y-auto">
-<div className="flex flex-col items-center p-4 pb-32 min-h-max">
-{/* Header */}
-<div className="w-full max-w-md flex justify-between items-center py-4">
-<h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-<Sparkles className="text-pink-500" size={20} /> BeautyPlus Cam
-</h1>
-<button
-onClick={() => setFacingMode(prev => prev === "user" ? "environment" :
-"user")}
-className="p-2 bg-white rounded-full shadow-sm border border-gray-100"
->
-<FlipHorizontal size={20} />
-</button>
-</div>
-{/* Main Viewport (Camera) */}
-<div className="relative w-full max-w-sm aspect-[3/4] bg-black rounded-3xl
-overflow-hidden shadow-2xl border-4 border-white">
-<Webcam
-audio={false}
-ref={webcamRef}
-screenshotFormat="image/jpeg"
-videoConstraints={{ facingMode }}
-mirrored={facingMode === "user"}
+      {/* Main Viewport (Camera) */}
+      <div className="relative w-full max-w-sm aspect-[3/4] bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
+        <Webcam
+          audio={false}
+          ref={webcamRef}
+          screenshotFormat="image/jpeg"
+          videoConstraints={{ facingMode }}
+          mirrored={facingMode === "user"}
+          className="w-full h-full object-cover"
+          style={{ filter: selectedFilter.class }}
+        />
+        
+        {/* Countdown Overlay */}
+        <AnimatePresence>
+          {countdown !== null && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-sm z-10"
+            >
+              <span className="text-white text-9xl font-bold">{countdown}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
-className="w-full h-full object-cover"
-style={{ filter: selectedFilter.class }}
-/>
-{/* Countdown Overlay */}
-<AnimatePresence>
-{countdown !== null && (
-<motion.div
-initial={{ opacity: 0, scale: 0.5 }}
-animate={{ opacity: 1, scale: 1 }}
-exit={{ opacity: 0 }}
+      {/* Toolbar: Filters & Frames */}
+      <div className="w-full max-w-md mt-6 space-y-8 flex-shrink-0">
+        
+        {/* Filter Selection */}
+        <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+          {FILTERS.map(f => (
+            <button 
+              key={f.id}
+              onClick={() => setSelectedFilter(f)}
+              className={`flex-shrink-0 flex flex-col items-center gap-1 ${selectedFilter.id === f.id ? 'text-pink-500' : 'text-gray-400'}`}
+            >
+              <div className={`w-14 h-14 rounded-full border-2 ${selectedFilter.id === f.id ? 'border-pink-500' : 'border-transparent'} overflow-hidden bg-gray-200`}>
+                <div className="w-full h-full" style={{ filter: f.class, background: 'linear-gradient(45deg, #ff9a9e, #fad0c4)' }} />
+              </div>
+              <span className="text-xs font-medium">{f.name}</span>
+            </button>
+          ))}
+        </div>
 
-className="absolute inset-0 flex items-center justify-center bg-
-black/10 backdrop-blur-sm z-10"
+        {/* Capture Button */}
+        <div className="flex justify-center">
+          <button
+            onClick={startCapture}
+            disabled={photos.length >= 4 || isCapturing}
+            className="w-20 h-20 bg-white border-4 border-pink-500 rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-transform disabled:opacity-50"
+          >
+            <div className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center text-white">
+              <Camera size={32} />
+            </div>
+          </button>
+        </div>
 
->
-<span className="text-white text-9xl font-bold">{countdown}</span>
-</motion.div>
-)}
-</AnimatePresence>
-</div>
-{/* Toolbar: Filters & Capture */}
-<div className="w-full max-w-md mt-6 space-y-8 flex-shrink-0">
-{/* Filter Selection */}
-<div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-{FILTERS.map(f => (
-<button
-key={f.id}
-onClick={() => setSelectedFilter(f)}
-className={`flex-shrink-0 flex flex-col items-center gap-1 $
-{selectedFilter.id === f.id ? 'text-pink-500' : 'text-gray-400'}`}
->
-<div className={`w-14 h-14 rounded-full border-2 $
+        {/* Result & Template Preview */}
+        {photos.length > 0 && (
+          <div className="flex flex-col items-center gap-6 pt-10">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Preview Template</h2>
+            
+            <div 
+              ref={templateRef}
+              className="p-4 flex flex-col gap-3 shadow-2xl"
+              style={{ backgroundColor: selectedFrame.bgColor, border: `8px solid ${selectedFrame.borderColor}`, width: '280px' }}
+            >
+              <div className="grid grid-cols-1 gap-2">
+                {photos.map((p, i) => (
+                  <div key={i} className="aspect-[4/3] overflow-hidden bg-gray-100">
+                    <img 
+                      src={p} 
+                      className="w-full h-full object-cover" 
+                      style={{ filter: selectedFilter.class, transform: facingMode === 'user' ? 'scaleX(-1)' : '' }} 
+                    />
+                  </div>
+                ))}
+                {[...Array(4 - photos.length)].map((_, i) => (
+                  <div key={i} className="aspect-[4/3] bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-xs">
+                    Wait for shot {photos.length + i + 1}
+                  </div>
+                ))}
+              </div>
+              <div className="text-center py-2">
+                <p className="font-serif italic text-lg" style={{ color: selectedFrame.textColor }}>{selectedFrame.name}</p>
+                <p className="text-[10px] tracking-[3px] opacity-50 uppercase">May 14, 2026</p>
+              </div>
+            </div>
 
-{selectedFilter.id === f.id ? 'border-pink-500' : 'border-transparent'} overflow-
-hidden bg-gray-200`}>
+            {/* Frame Chooser */}
+            <div className="flex gap-2">
+              {FRAMES.map(frame => (
+                <button
+                  key={frame.id}
+                  onClick={() => setSelectedFrame(frame)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold border-2 transition ${selectedFrame.id === frame.id ? 'bg-black text-white border-black' : 'bg-white text-gray-400 border-gray-200'}`}
+                >
+                  {frame.name}
+                </button>
+              ))}
+            </div>
 
-<div className="w-full h-full" style={{ filter: f.class,
-background: 'linear-gradient(45deg, #ff9a9e, #fad0c4)' }} />
-</div>
-<span className="text-xs font-medium">{f.name}</span>
-</button>
-))}
-</div>
-{/* Capture Button */}
-<div className="flex justify-center">
-<button
-onClick={startCapture}
-
-disabled={photos.length >= 4 || isCapturing}
-className="w-20 h-20 bg-white border-4 border-pink-500 rounded-full
-flex items-center justify-center shadow-xl active:scale-90 transition-transform
-disabled:opacity-50"
->
-<div className="w-16 h-16 bg-pink-500 rounded-full flex items-center
-justify-center text-white">
-<Camera size={32} />
-</div>
-</button>
-</div>
-{/* Result & Template Preview */}
-{photos.length > 0 && (
-<div className="flex flex-col items-center gap-6 pt-10">
-
-<h2 className="text-sm font-bold text-gray-400 uppercase tracking-
-widest">Preview Template</h2>
-
-<div
-ref={templateRef}
-className="p-4 flex flex-col gap-3 shadow-2xl"
-style={{ backgroundColor: selectedFrame.bgColor, border: `8px solid
-${selectedFrame.borderColor}`, width: '280px' }}
->
-<div className="grid grid-cols-1 gap-2">
-{photos.map((p, i) => (
-
-<div key={i} className="aspect-[4/3] overflow-hidden bg-
-gray-100">
-
-<img
-src={p}
-className="w-full h-full object-cover"
-style={{ filter: selectedFilter.class, transform:
-facingMode === 'user' ? 'scaleX(-1)' : '' }}
-/>
-</div>
-))}
-{[...Array(4 - photos.length)].map((_, i) => (
-
-<div key={i} className="aspect-[4/3] bg-gray-50 border border-
-dashed border-gray-200 flex items-center justify-center text-gray-300 text-xs">
-
-Wait for shot {photos.length + i + 1}
-</div>
-))}
-</div>
-<div className="text-center py-2">
-<p className="font-serif italic text-lg" style={{ color:
-selectedFrame.textColor }}>{selectedFrame.name}</p>
-<p className="text-[10px] tracking-[3px] opacity-50
-
-uppercase">May 14, 2026</p>
-</div>
-</div>
-{/* Frame Chooser */}
-<div className="flex gap-2">
-{FRAMES.map(frame => (
-<button
-key={frame.id}
-onClick={() => setSelectedFrame(frame)}
-className={`px-4 py-2 rounded-full text-xs font-bold border-2
-transition ${selectedFrame.id === frame.id ? 'bg-black text-white border-black' :
-'bg-white text-gray-400 border-gray-200'}`}
->
-{frame.name}
-</button>
-))}
-</div>
-{/* Action Buttons */}
-<div className="flex gap-4 w-full px-4">
-
-<button onClick={() => setPhotos([])} className="flex-1 flex items-
-center justify-center gap-2 py-3 bg-gray-100 rounded-2xl text-gray-600 font-bold
-
-text-sm">
-<RotateCcw size={18} /> Reset
-</button>
-<button onClick={downloadImage} className="flex-1 flex items-center
-justify-center gap-2 py-3 bg-pink-500 rounded-2xl text-white font-bold text-sm
-shadow-lg shadow-pink-200">
-<Download size={18} /> Save Photo
-</button>
-</div>
-</div>
-)}
-</div>
-</div>
-</div>
-);
-
+            {/* Action Buttons */}
+            <div className="flex gap-4 w-full px-4">
+              <button onClick={() => setPhotos([])} className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 rounded-2xl text-gray-600 font-bold text-sm">
+                <RotateCcw size={18} /> Reset
+              </button>
+              <button onClick={downloadImage} className="flex-1 flex items-center justify-center gap-2 py-3 bg-pink-500 rounded-2xl text-white font-bold text-sm shadow-lg shadow-pink-200">
+                <Download size={18} /> Save Photo
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
 export default PhotoBooth
