@@ -87,7 +87,7 @@ const PhotoBooth = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#FDFCF8] p-4 text-[#4A4A4A]">
+    <div className="flex flex-col items-center min-h-screen w-full bg-[#FDFCF8] p-4 md:p-8 text-[#4A4A4A] overflow-y-auto">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
