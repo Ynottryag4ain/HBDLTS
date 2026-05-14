@@ -200,4 +200,6 @@ const PhotoBooth = () => {
         )}
       </div>
     </div>
+      );
+      };
 export default PhotoBooth
