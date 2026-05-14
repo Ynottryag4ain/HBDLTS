@@ -1,390 +1,186 @@
 'use client'
-import { useState, useRef, useCallback, useEffect } from 'react'
+
+import React, { useRef, useState, useCallback, useEffect } from 'react'
+import Webcam from 'react-webcam'
+import { toPng } from 'html-to-image'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAppStore } from '../store/appStore'
 
-type Stage = 'intro' | 'shooting' | 'review' | 'strip' | 'denied'
-
-const FILTERS = [
-  { id: 'none', label: 'Normal', preview: 'brightness(1)', fn: null },
-]
-
-const TEMPLATES = [
-  {
-    id: 'minimal',
-    label: '🤍 Minimal',
-    bgTop: '#ffffff',
-    bgBottom: '#f8f8f8',
-    frameColor: '#e0e0e0',
-    accentColor: '#ff6b9d',
-    textColor: '#333333',
-    headerText: 'Photo Booth',
-    footerText: 'with love ✦',
-  },
-]
-
-export default function PhotoBooth() {
-  const { addPhoto, setScreen } = useAppStore()
-
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-
-  const [stage, setStage] = useState<Stage>('intro')
+const PhotoBooth = () => {
+  const webcamRef = useRef<Webcam>(null)
+  const templateRef = useRef<HTMLDivElement>(null)
+  
   const [photos, setPhotos] = useState<string[]>([])
-  const [countdown, setCountdown] = useState(0)
-  const [isCounting, setIsCounting] = useState(false)
-  const [flash, setFlash] = useState(false)
+  const [isCapturing, setIsCapturing] = useState(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [isDone, setIsDone] = useState(false)
 
-  const photosRef = useRef<string[]>([])
-  const TOTAL = 4
-
-  // cleanup
-  useEffect(() => {
-    return () => {
-      streamRef.current?.getTracks().forEach(track => track.stop())
-    }
-  }, [])
-
-  // ─────────────────────────────────────────────
-  // CAMERA FIX FOR VERCEL + iPHONE + SAFARI
-  // ─────────────────────────────────────────────
-  async function openCamera() {
-  try {
-    if (
-      typeof navigator === 'undefined' ||
-      !navigator.mediaDevices ||
-      !navigator.mediaDevices.getUserMedia
-    ) {
-      console.error('Camera API not supported')
-      setStage('denied')
-      return
-    }
-
-    // stop old stream
-    streamRef.current?.getTracks().forEach(track => track.stop())
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'user',
-      },
-      audio: false,
-    })
-
-    streamRef.current = stream
-
-    const video = videoRef.current
-
-    if (!video) {
-      console.error('Video element missing')
-      return
-    }
-
-    video.srcObject = stream
-    video.muted = true
-    video.playsInline = true
-    video.autoplay = true
-
-    // IMPORTANT FIX
-    video.onloadedmetadata = () => {
-      video.play().catch(err => {
-        console.error('Play error:', err)
-      })
-
-      setStage('shooting')
-    }
-
-  } catch (err) {
-    console.error('Camera error:', err)
-    setStage('denied')
-  }
-}
-
-  // capture photo
-  const capture = useCallback(async () => {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-
-    if (!video || !canvas) return
-
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-
-    const ctx = canvas.getContext('2d')
-
-    if (!ctx) return
-
-    // mirror
-    ctx.save()
-    ctx.scale(-1, 1)
-    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height)
-    ctx.restore()
-
-    const url = canvas.toDataURL('image/jpeg', 0.92)
-
-    photosRef.current = [...photosRef.current, url]
-
-    setPhotos([...photosRef.current])
-
-    addPhoto(url)
-
-    if (photosRef.current.length >= TOTAL) {
-      streamRef.current?.getTracks().forEach(track => track.stop())
-      setStage('review')
-    }
-  }, [addPhoto])
-
-  // countdown
-  const startCountdown = useCallback(() => {
-    if (isCounting) return
-
-    setIsCounting(true)
+  // ฟังก์ชันนับถอยหลังก่อนถ่าย
+  const startCaptureFlow = () => {
+    if (photos.length >= 4) return
+    setIsCapturing(true)
     setCountdown(3)
+  }
 
-    let c = 3
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    if (countdown !== null && countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+    } else if (countdown === 0) {
+      takePhoto()
+      setCountdown(null)
+      setIsCapturing(false)
+    }
+    return () => clearTimeout(timer)
+  }, [countdown])
 
-    const iv = setInterval(() => {
-      c--
+  const takePhoto = useCallback(() => {
+    const imageSrc = webcamRef.current?.getScreenshot()
+    if (imageSrc) {
+      const newPhotos = [...photos, imageSrc]
+      setPhotos(newPhotos)
+      if (newPhotos.length === 4) setIsDone(true)
+    }
+  }, [photos])
 
-      setCountdown(c)
+  const downloadImage = async () => {
+    if (templateRef.current === null) return
+    const dataUrl = await toPng(templateRef.current, { 
+      quality: 1,
+      pixelRatio: 2 // เพิ่มความชัดของรูปที่โหลด
+    })
+    const link = document.createElement('a')
+    link.download = `hbd-photobooth-${Date.now()}.png`
+    link.href = dataUrl
+    link.click()
+  }
 
-      if (c <= 0) {
-        clearInterval(iv)
-
-        setFlash(true)
-
-        setTimeout(async () => {
-          await capture()
-          setFlash(false)
-          setIsCounting(false)
-        }, 150)
-      }
-    }, 1000)
-  }, [capture, isCounting])
-
-  // reset
-  function retake() {
-    photosRef.current = []
+  const resetPhotos = () => {
     setPhotos([])
-
-    streamRef.current?.getTracks().forEach(track => track.stop())
-
-    streamRef.current = null
-
-    setStage('intro')
+    setIsDone(false)
   }
 
   return (
-    <div
-      className="w-full min-h-screen flex flex-col"
-      style={{
-        background:
-          'linear-gradient(160deg,#1a0a2e 0%,#2d1158 60%,#1a0a2e 100%)',
-      }}
-    >
-      <canvas ref={canvasRef} className="hidden" />
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#FDFCF8] p-6 text-[#4A4A4A]">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-5xl w-full flex flex-col md:flex-row gap-12 items-center justify-center"
+      >
+        
+        {/* --- ส่วนซ้าย: กล้องและการควบคุม --- */}
+        <div className="flex flex-col items-center gap-6 w-full max-w-md">
+          <div className="text-center">
+            <h2 className="text-3xl font-serif mb-2">Photo Booth</h2>
+            <p className="text-sm text-gray-400 uppercase tracking-widest">Take 4 special shots</p>
+          </div>
 
-      {/* top */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <button
-          onClick={() => {
-            retake()
-            setScreen('letter')
-          }}
-          className="text-white"
-        >
-          ←
-        </button>
+          <div className="relative aspect-[3/4] w-full bg-black rounded-[2rem] overflow-hidden shadow-2xl border-[12px] border-white">
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              videoConstraints={{ facingMode: "user", aspectRatio: 0.75 }}
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Overlay Countdown */}
+            <AnimatePresence>
+              {countdown !== null && (
+                <motion.div 
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1.2, opacity: 1 }}
+                  exit={{ scale: 2, opacity: 0 }}
+                  className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm"
+                >
+                  <span className="text-white text-8xl font-bold">{countdown}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-        <h1 className="text-white font-bold text-lg">
-          📸 Photo Booth
-        </h1>
-
-        <div className="w-5" />
-      </div>
-
-      <div className="flex-1 px-4 pb-6">
-        <AnimatePresence mode="wait">
-
-          {/* intro */}
-          {stage === 'intro' && (
-            <motion.div
-              key="intro"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center min-h-[80vh] gap-6"
-            >
-              <div className="text-7xl">📸</div>
-
-              <div className="text-center">
-                <p className="text-white text-2xl font-bold">
-                  Photo Booth
-                </p>
-
-                <p className="text-white/60">
-                  ถ่าย {TOTAL} รูป
-                </p>
-              </div>
-
-              <motion.button
-                onClick={async () => {
-                  await openCamera()
-                }}
-                className="bg-gradient-to-r from-pink-400 to-purple-500 text-white px-8 py-4 rounded-2xl font-bold shadow-xl"
-                whileTap={{ scale: 0.95 }}
-              >
-                เปิดกล้อง 📷
-              </motion.button>
-            </motion.div>
-          )}
-
-          {/* denied */}
-          {stage === 'denied' && (
-            <motion.div
-              key="denied"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center min-h-[80vh] gap-4 text-center"
-            >
-              <div className="text-6xl">😢</div>
-
-              <p className="text-white font-bold text-xl">
-                เปิดกล้องไม่ได้
-              </p>
-
-              <p className="text-white/50 text-sm max-w-xs">
-                กรุณาอนุญาตกล้องใน Safari หรือ Chrome
-              </p>
-
-              <button
-                onClick={() => setStage('intro')}
-                className="bg-pink-500 text-white px-6 py-3 rounded-xl"
-              >
-                ลองใหม่
-              </button>
-            </motion.div>
-          )}
-
-          {/* shooting */}
-          {stage === 'shooting' && (
-            <motion.div
-              key="shooting"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col gap-4"
-            >
-              <div
-                className="relative rounded-2xl overflow-hidden bg-black"
-                style={{ aspectRatio: '4/3' }}
-              >
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                  style={{
-                    transform: 'scaleX(-1)',
-                  }}
+            {/* Flash Effect */}
+            <AnimatePresence>
+              {countdown === 0 && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-white z-50"
                 />
-
-                {/* flash */}
-                <AnimatePresence>
-                  {flash && (
-                    <motion.div
-                      className="absolute inset-0 bg-white"
-                      initial={{ opacity: 1 }}
-                      animate={{ opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  )}
-                </AnimatePresence>
-
-                {/* countdown */}
-                <AnimatePresence>
-                  {isCounting && countdown > 0 && (
-                    <motion.div
-                      key={countdown}
-                      className="absolute inset-0 flex items-center justify-center"
-                      initial={{ scale: 2, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.5, opacity: 0 }}
-                    >
-                      <span className="text-white text-8xl font-black">
-                        {countdown}
-                      </span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="absolute top-3 right-3 bg-black/60 px-3 py-1 rounded-full text-white text-xs">
-                  {photos.length}/{TOTAL}
-                </div>
-              </div>
-
-              {/* photos */}
-              {photos.length > 0 && (
-                <div className="flex gap-2 justify-center">
-                  {photos.map((url, i) => (
-                    <img
-                      key={i}
-                      src={url}
-                      className="w-14 h-14 rounded-lg object-cover"
-                    />
-                  ))}
-                </div>
               )}
+            </AnimatePresence>
+          </div>
 
-              {/* shutter */}
-              {!isCounting && photos.length < TOTAL && (
-                <div className="flex justify-center">
-                  <motion.button
-                    onClick={startCountdown}
-                    whileTap={{ scale: 0.92 }}
-                    className="w-20 h-20 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center shadow-2xl"
-                  >
-                    <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-3xl">
-                      📸
+          <button
+            disabled={isCapturing || isDone}
+            onClick={startCaptureFlow}
+            className={`w-full py-4 rounded-full font-medium transition-all shadow-lg ${
+              isDone 
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+              : 'bg-[#FF8A8A] text-white hover:bg-[#ff7575] active:scale-95'
+            }`}
+          >
+            {isDone ? 'Captured All Photos' : isCapturing ? 'Get Ready...' : 'Take a Photo'}
+          </button>
+        </div>
+
+        {/* --- ส่วนขวา: Template Preview --- */}
+        <div className="flex flex-col items-center gap-6">
+          <div 
+            ref={templateRef}
+            className="bg-white p-5 shadow-[0_20px_50px_rgba(0,0,0,0.1)] w-[280px] flex flex-col gap-3"
+          >
+            {/* Photo Slots */}
+            <div className="grid grid-cols-1 gap-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="aspect-[4/3] bg-[#F3F3F3] overflow-hidden border border-gray-100">
+                  {photos[i] ? (
+                    <motion.img 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      src={photos[i]} 
+                      className="w-full h-full object-cover contrast-[1.05] brightness-[1.02]"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-[10px] text-gray-300 uppercase tracking-tighter">Frame {i + 1}</span>
                     </div>
-                  </motion.button>
+                  )}
                 </div>
-              )}
-            </motion.div>
-          )}
+              ))}
+            </div>
 
-          {/* review */}
-          {stage === 'review' && (
-            <motion.div
-              key="review"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col gap-4 py-4"
-            >
-              <p className="text-white text-center text-xl font-bold">
-                🎉 ถ่ายเสร็จแล้ว
-              </p>
+            {/* Template Footer */}
+            <div className="mt-4 mb-2 flex flex-col items-center gap-1">
+              <h3 className="text-sm font-serif italic text-gray-600">Birthday Memories</h3>
+              <p className="text-[9px] tracking-[0.4em] text-gray-300 uppercase">May 14, 2026</p>
+            </div>
+          </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {photos.map((url, i) => (
-                  <img
-                    key={i}
-                    src={url}
-                    className="rounded-xl aspect-video object-cover"
-                  />
-                ))}
-              </div>
-
-              <button
-                onClick={retake}
-                className="bg-white/10 text-white py-3 rounded-2xl"
+          {/* Download & Reset Buttons */}
+          <AnimatePresence>
+            {photos.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-4"
               >
-                🔄 ถ่ายใหม่
-              </button>
-            </motion.div>
-          )}
+                <button onClick={resetPhotos} className="text-sm text-gray-400 hover:text-red-400 transition">
+                  Reset
+                </button>
+                <button 
+                  onClick={downloadImage}
+                  className="bg-black text-white px-8 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition shadow-md"
+                >
+                  Save Image
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
-        </AnimatePresence>
-      </div>
+      </motion.div>
     </div>
   )
 }
+
+export default PhotoBooth
