@@ -50,53 +50,55 @@ export default function PhotoBooth() {
   // CAMERA FIX FOR VERCEL + iPHONE + SAFARI
   // ─────────────────────────────────────────────
   async function openCamera() {
-    try {
-      // browser support
-      if (
-        typeof navigator === 'undefined' ||
-        !navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia
-      ) {
-        console.error('Camera API not supported')
-        setStage('denied')
-        return
-      }
+  try {
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices ||
+      !navigator.mediaDevices.getUserMedia
+    ) {
+      console.error('Camera API not supported')
+      setStage('denied')
+      return
+    }
 
-      // stop old stream
-      streamRef.current?.getTracks().forEach(track => track.stop())
+    // stop old stream
+    streamRef.current?.getTracks().forEach(track => track.stop())
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      })
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'user',
+      },
+      audio: false,
+    })
 
-      streamRef.current = stream
+    streamRef.current = stream
 
-      const video = videoRef.current
+    const video = videoRef.current
 
-      if (!video) {
-        console.error('Video element not found')
-        return
-      }
+    if (!video) {
+      console.error('Video element missing')
+      return
+    }
 
-      video.srcObject = stream
-      video.muted = true
-      video.playsInline = true
+    video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
+    video.autoplay = true
 
-      await video.play().catch(err => {
-        console.error('Video play error:', err)
+    // IMPORTANT FIX
+    video.onloadedmetadata = () => {
+      video.play().catch(err => {
+        console.error('Play error:', err)
       })
 
       setStage('shooting')
-    } catch (err) {
-      console.error('Camera error:', err)
-      setStage('denied')
     }
+
+  } catch (err) {
+    console.error('Camera error:', err)
+    setStage('denied')
   }
+}
 
   // capture photo
   const capture = useCallback(async () => {
