@@ -68,7 +68,7 @@ const PhotoBooth = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center p-4 pb-20">
+    <div className="min-h-full w-full bg-[#fafafa] flex flex-col items-center p-4 pb-24 overflow-y-auto">
       
       {/* Header */}
       <div className="w-full max-w-md flex justify-between items-center py-4">
@@ -111,7 +111,7 @@ const PhotoBooth = () => {
       </div>
 
       {/* Toolbar: Filters & Frames */}
-      <div className="w-full max-w-md mt-6 space-y-6">
+      <div className="w-full max-w-md mt-6 space-y-8 flex-shrink-0">
         
         {/* Filter Selection */}
         <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
