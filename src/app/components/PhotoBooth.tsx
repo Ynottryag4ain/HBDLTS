@@ -15,9 +15,9 @@ const FILTERS = [
 ]
 
 const FRAMES = [
-  { id: 'heart', name: 'HBD 2026', bgColor: '#eef2ff', borderColor: '#ff8a8a', textColor: '#ff8a8a' },
-  { id: 'stripe', name: 'Happy Birthday', bgColor: '#ffffff', borderColor: '#3b82f6', textColor: '#3b82f6' },
-  { id: 'confetti', name: 'HBD LTS', bgColor: '#fff5f5', borderColor: '#ffd700', textColor: '#ff4785' },
+  { id: 'heart', name: 'Happy Birth Day', bgColor: '#FFFFFF', borderColor: '#FFFFFF', textColor: '#1C1C1C' },
+  { id: 'stripe', name: 'ทำไมไม่อาบน้ำ', bgColor: '#ffffff', borderColor: '#3b82f6', textColor: '#3b82f6' },
+  { id: 'confetti', name: 'HBD Lacta', bgColor: '#fff5f5', borderColor: '#ffd700', textColor: '#ff4785' },
 ]
 
 const PhotoBooth = () => {
