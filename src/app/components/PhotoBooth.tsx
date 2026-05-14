@@ -4,12 +4,22 @@ import React, { useRef, useState, useCallback, useEffect } from 'react'
 import Webcam from 'react-webcam'
 import html2canvas from 'html2canvas'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeftRight, Camera, RefreshCcw, Download } from 'lucide-react'
+import { Camera, RotateCcw, Download, FlipHorizontal, Sparkles } from 'lucide-react'
 
-const FRAME_OPTIONS = [
-  { id: 'hbd-2026', title: 'HBD 2026 (Heart Pattern)', text: 'HBD 2026' },
-  { id: 'happy-birthday-banner', title: 'HAPPY BIRTHDAY (Striped Banner)', text: 'HAPPY BIRTHDAY' },
-  { id: 'hbd-lts', title: 'HBD LTS (Confetti & Balloons)', text: 'HBD LTS' },
+// รายชื่อฟิลเตอร์สไตล์ BeautyPlus
+const FILTERS = [
+  { id: 'none', name: 'Original', class: '' },
+  { id: 'sweet', name: 'Sweet', class: 'brightness(1.1) contrast(1.1) saturate(1.2) sepia(0.1)' },
+  { id: 'nostalgia', name: 'Vintage', class: 'sepia(0.4) contrast(0.9) brightness(1.1)' },
+  { id: 'bw', name: 'B&W', class: 'grayscale(1) contrast(1.2)' },
+  { id: 'glow', name: 'Soft Glow', class: 'brightness(1.2) blur(0.5px) saturate(0.8)' },
+]
+
+// รายชื่อเฟรมตามที่คุณส่งมา
+const FRAMES = [
+  { id: 'heart', name: 'HBD 2026', bgColor: '#eef2ff', borderColor: '#ff8a8a', textColor: '#ff8a8a' },
+  { id: 'stripe', name: 'Happy Birthday', bgColor: '#ffffff', borderColor: '#3b82f6', textColor: '#3b82f6' },
+  { id: 'confetti', name: 'HBD LTS', bgColor: '#fff5f5', borderColor: '#ffd700', textColor: '#ff4785' },
 ]
 
 const PhotoBooth = () => {
@@ -19,215 +29,176 @@ const PhotoBooth = () => {
   const [photos, setPhotos] = useState<string[]>([])
   const [isCapturing, setIsCapturing] = useState(false)
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [isDone, setIsDone] = useState(false)
-  
-  // สถานะกล้อง (user = กล้องหน้า, environment = กล้องหลัง)
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user")
-  
-  // สถานะเฟรมภาพที่เลือก
-  const [selectedFrame, setSelectedFrame] = useState(FRAME_OPTIONS[0].id)
+  const [selectedFilter, setSelectedFilter] = useState(FILTERS[0])
+  const [selectedFrame, setSelectedFrame] = useState(FRAMES[0])
 
-  const toggleFacingMode = () => {
-    setFacingMode(prev => (prev === "user" ? "environment" : "user"))
-  }
-
-  const startCaptureFlow = () => {
+  const startCapture = () => {
     if (photos.length >= 4) return
     setIsCapturing(true)
     setCountdown(3)
   }
 
   useEffect(() => {
-    let timer: NodeJS.Timeout
-    if (countdown !== null && countdown > 0) {
-      timer = setTimeout(() => setCountdown(countdown - 1), 1000)
-    } else if (countdown === 0) {
+    if (countdown === null) return
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+      return () => clearTimeout(timer)
+    } else {
       takePhoto()
       setCountdown(null)
       setIsCapturing(false)
     }
-    return () => clearTimeout(timer)
   }, [countdown])
 
   const takePhoto = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot()
     if (imageSrc) {
-      const newPhotos = [...photos, imageSrc]
-      setPhotos(newPhotos)
-      if (newPhotos.length === 4) setIsDone(true)
+      setPhotos(prev => [...prev, imageSrc])
     }
-  }, [photos])
+  }, [webcamRef])
 
   const downloadImage = async () => {
-    if (templateRef.current === null) return
-    
-    // ใช้ html2canvas เพื่อรวมเฟรมภาพและรูปถ่าย
-    const canvas = await html2canvas(templateRef.current, {
-      scale: 2, 
-      backgroundColor: null,
-      logging: false,
-    })
-    
-    const dataUrl = canvas.toDataURL('image/png')
+    if (!templateRef.current) return
+    const canvas = await html2canvas(templateRef.current, { scale: 2 })
     const link = document.createElement('a')
-    link.download = `hbd-photobooth-${Date.now()}.png`
-    link.href = dataUrl
+    link.download = `beauty-snap-${Date.now()}.png`
+    link.href = canvas.toDataURL('image/png')
     link.click()
   }
 
-  const resetPhotos = () => {
-    setPhotos([])
-    setIsDone(false)
-  }
-
-  // สร้างฟังก์ชันเพื่อดึงข้อความจากเฟรมที่เลือก
-  const getSelectedFrameText = () => {
-    const frame = FRAME_OPTIONS.find(f => f.id === selectedFrame)
-    return frame ? frame.text : ''
-  }
-
   return (
-    <div className="flex flex-col items-center min-h-screen w-full bg-[#FDFCF8] p-4 md:p-8 text-[#4A4A4A] overflow-y-auto">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-7xl flex flex-col md:flex-row gap-8 lg:gap-12 items-center justify-center"
-      >
+    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center p-4 pb-20">
+      
+      {/* Header */}
+      <div className="w-full max-w-md flex justify-between items-center py-4">
+        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <Sparkles className="text-pink-500" size={20} /> BeautyPlus Cam
+        </h1>
+        <button 
+          onClick={() => setFacingMode(prev => prev === "user" ? "environment" : "user")}
+          className="p-2 bg-white rounded-full shadow-sm border border-gray-100"
+        >
+          <FlipHorizontal size={20} />
+        </button>
+      </div>
+
+      {/* Main Viewport (Camera) */}
+      <div className="relative w-full max-w-sm aspect-[3/4] bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
+        <Webcam
+          audio={false}
+          ref={webcamRef}
+          screenshotFormat="image/jpeg"
+          videoConstraints={{ facingMode }}
+          mirrored={facingMode === "user"}
+          className="w-full h-full object-cover"
+          style={{ filter: selectedFilter.class }}
+        />
         
-        {/* --- ส่วนซ้าย: กล้องและการควบคุม --- */}
-        <div className="flex flex-col items-center gap-5 w-full md:w-auto md:max-w-md lg:max-w-lg">
-          <div className="text-center">
-            <h2 className="text-2xl md:text-3xl font-serif mb-1">Mobile Photo Booth</h2>
-            <p className="text-xs text-gray-400 uppercase tracking-widest">Flip, Frame, & Capture 4 Shots</p>
-          </div>
-
-          <div className="relative aspect-[3/4] w-full max-w-[320px] bg-black rounded-[2rem] overflow-hidden shadow-2xl border-[10px] border-white">
-            <Webcam
-              audio={false}
-              ref={webcamRef}
-              screenshotFormat="image/jpeg"
-              videoConstraints={{ facingMode, aspectRatio: 0.75 }}
-              mirrored={facingMode === "user"} // กระจกเฉพาะกล้องหน้า
-              className="w-full h-full object-cover"
-            />
-            
-            {/* Countdown & Flash (เหมือนเดิม) */}
-            <AnimatePresence>
-              {countdown !== null && (
-                <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1.2, opacity: 1 }} exit={{ scale: 2, opacity: 0 }} className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-30">
-                  <span className="text-white text-7xl font-bold">{countdown}</span>
-                </motion.div>
-              )}
-              {countdown === 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-white z-50"/>
-              )}
-            </AnimatePresence>
-
-            {/* ปุ่มสลับกล้อง (Overlay) */}
-            <button 
-              onClick={toggleFacingMode} 
-              className="absolute top-4 right-4 bg-white/70 hover:bg-white text-black p-3 rounded-full shadow-md z-40 transition"
-              title={`Switch to ${facingMode === "user" ? "Back" : "Front"} Camera`}
+        {/* Countdown Overlay */}
+        <AnimatePresence>
+          {countdown !== null && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-sm z-10"
             >
-              <ArrowLeftRight size={20} />
-            </button>
-          </div>
+              <span className="text-white text-9xl font-bold">{countdown}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
+      {/* Toolbar: Filters & Frames */}
+      <div className="w-full max-w-md mt-6 space-y-6">
+        
+        {/* Filter Selection */}
+        <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+          {FILTERS.map(f => (
+            <button 
+              key={f.id}
+              onClick={() => setSelectedFilter(f)}
+              className={`flex-shrink-0 flex flex-col items-center gap-1 ${selectedFilter.id === f.id ? 'text-pink-500' : 'text-gray-400'}`}
+            >
+              <div className={`w-14 h-14 rounded-full border-2 ${selectedFilter.id === f.id ? 'border-pink-500' : 'border-transparent'} overflow-hidden bg-gray-200`}>
+                <div className="w-full h-full" style={{ filter: f.class, background: 'linear-gradient(45deg, #ff9a9e, #fad0c4)' }} />
+              </div>
+              <span className="text-xs font-medium">{f.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Capture Button */}
+        <div className="flex justify-center">
           <button
-            disabled={isCapturing || isDone}
-            onClick={startCaptureFlow}
-            className={`w-full max-w-[320px] py-4 rounded-full font-medium transition-all shadow-lg flex items-center justify-center gap-2 ${
-              isDone 
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-              : 'bg-[#FF8A8A] text-white hover:bg-[#ff7575] active:scale-95'
-            }`}
+            onClick={startCapture}
+            disabled={photos.length >= 4 || isCapturing}
+            className="w-20 h-20 bg-white border-4 border-pink-500 rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-transform disabled:opacity-50"
           >
-            <Camera size={20} />
-            {isDone ? 'Captured All Photos' : isCapturing ? 'Get Ready...' : `Take Photo (${photos.length}/4)`}
+            <div className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center text-white">
+              <Camera size={32} />
+            </div>
           </button>
         </div>
 
-        {/* --- ส่วนขวา: Template Preview & Control --- */}
-        <div className="flex flex-col items-center gap-8 w-full md:w-auto">
-          
-          {/* ส่วนเลือกเฟรม */}
-          <div className="w-full max-w-[280px] bg-white p-4 rounded-xl shadow-md border border-gray-100">
-            <label className="block text-sm font-medium text-gray-600 mb-3 text-center">Select Frame</label>
-            <div className="grid grid-cols-1 gap-2">
-              {FRAME_OPTIONS.map((frame) => (
+        {/* Result & Template Preview */}
+        {photos.length > 0 && (
+          <div className="flex flex-col items-center gap-6 pt-10">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Preview Template</h2>
+            
+            <div 
+              ref={templateRef}
+              className="p-4 flex flex-col gap-3 shadow-2xl"
+              style={{ backgroundColor: selectedFrame.bgColor, border: `8px solid ${selectedFrame.borderColor}`, width: '280px' }}
+            >
+              <div className="grid grid-cols-1 gap-2">
+                {photos.map((p, i) => (
+                  <div key={i} className="aspect-[4/3] overflow-hidden bg-gray-100">
+                    <img 
+                      src={p} 
+                      className="w-full h-full object-cover" 
+                      style={{ filter: selectedFilter.class, transform: facingMode === 'user' ? 'scaleX(-1)' : '' }} 
+                    />
+                  </div>
+                ))}
+                {[...Array(4 - photos.length)].map((_, i) => (
+                  <div key={i} className="aspect-[4/3] bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-xs">
+                    Wait for shot {photos.length + i + 1}
+                  </div>
+                ))}
+              </div>
+              <div className="text-center py-2">
+                <p className="font-serif italic text-lg" style={{ color: selectedFrame.textColor }}>{selectedFrame.name}</p>
+                <p className="text-[10px] tracking-[3px] opacity-50 uppercase">May 14, 2026</p>
+              </div>
+            </div>
+
+            {/* Frame Chooser */}
+            <div className="flex gap-2">
+              {FRAMES.map(frame => (
                 <button
                   key={frame.id}
-                  onClick={() => setSelectedFrame(frame.id)}
-                  className={`px-4 py-3 rounded-lg text-xs text-left border transition ${
-                    selectedFrame === frame.id 
-                      ? 'bg-black text-white border-black' 
-                      : 'bg-gray-50 text-gray-700 border-gray-100 hover:border-gray-300'
-                  }`}
+                  onClick={() => setSelectedFrame(frame)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold border-2 transition ${selectedFrame.id === frame.id ? 'bg-black text-white border-black' : 'bg-white text-gray-400 border-gray-200'}`}
                 >
-                  {frame.title}
+                  {frame.name}
                 </button>
               ))}
             </div>
-          </div>
 
-          {/* Template Preview (ส่วนที่จะ Export) */}
-          <div 
-            ref={templateRef}
-            className="bg-white p-4 lg:p-5 shadow-[0_15px_40px_rgba(0,0,0,0.08)] w-[260px] lg:w-[280px] flex flex-col gap-3 rounded-md"
-            style={{ border: '1px solid #f3f3f3' }}
-          >
-            {/* Photo Slots พร้อมเฟรมภาพซ้อนทับ */}
-            <div className="grid grid-cols-1 gap-2 lg:gap-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="aspect-[4/3] bg-[#F7F7F7] overflow-hidden border border-gray-100 relative group">
-                  {photos[i] ? (
-                    <>
-                      {/* รูปถ่าย */}
-                      <motion.img 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        src={photos[i]} 
-                        className="w-full h-full object-cover contrast-[1.03] brightness-[1.01]"
-                        // กลับภาพเฉพาะกล้องหน้าเมื่อแสดงผล
-                        style={{ transform: facingMode === "user" ? 'scaleX(-1)' : 'none' }}
-                      />
-                      {/* เฟรมภาพซ้อนทับ (Placeholder) */}
-                      <div className="absolute inset-x-0 bottom-0 py-2 bg-gradient-to-t from-black/50 to-transparent flex items-center justify-center z-10">
-                        <span className="text-[9px] lg:text-[10px] text-white font-bold uppercase tracking-tight">{getSelectedFrameText()}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-[10px] text-gray-300 uppercase tracking-tighter">Slot {i + 1}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Template Footer */}
-            <div className="mt-3 mb-1 flex flex-col items-center gap-1 border-t border-gray-100 pt-3">
-              <h3 className="text-xs lg:text-sm font-serif italic text-gray-600">Birthday Memories 2026</h3>
-              <p className="text-[8px] lg:text-[9px] tracking-[0.3em] text-gray-300 uppercase">CELEBRATION ROAD</p>
+            {/* Action Buttons */}
+            <div className="flex gap-4 w-full px-4">
+              <button onClick={() => setPhotos([])} className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 rounded-2xl text-gray-600 font-bold text-sm">
+                <RotateCcw size={18} /> Reset
+              </button>
+              <button onClick={downloadImage} className="flex-1 flex items-center justify-center gap-2 py-3 bg-pink-500 rounded-2xl text-white font-bold text-sm shadow-lg shadow-pink-200">
+                <Download size={18} /> Save Photo
+              </button>
             </div>
           </div>
-
-          {/* Download & Reset */}
-          <AnimatePresence>
-            {photos.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4">
-                <button onClick={resetPhotos} className="flex items-center gap-2 text-sm text-gray-400 hover:text-red-400 transition">
-                  <RefreshCcw size={16} /> Reset
-                </button>
-                <button onClick={downloadImage} className="flex items-center gap-2 bg-black text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-gray-800 transition shadow-md">
-                  <Download size={18} /> Save Image
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-      </motion.div>
+        )}
+      </div>
     </div>
   )
 }
